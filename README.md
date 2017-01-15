@@ -16,10 +16,11 @@ grpcproxy run -c path/to/config/file
 
 后端示例  
 ```
-gproxy service foo1
-gproxy service foo2
-gproxy service bar1
-gproxy service bar2
+gproxy service foo 51001
+gproxy service foo 51002
+gproxy service bar 51003
+gproxy service bar 51004
+gproxy service bar 51005
 ```
 
 测试  
