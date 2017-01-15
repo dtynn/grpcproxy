@@ -4,8 +4,8 @@
 ##### usage
 安装  
 ```
-go get gitlab.1dmy.com/ezbuy/grpcproxy
-go install gitlab.1dmy.com/ezbuy/grpcproxy/...
+go get -v github.com/dtynn/grpcproxy
+go install github.com/dtynn/grpcproxy/...
 ```
 
 
