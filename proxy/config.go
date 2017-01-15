@@ -19,6 +19,7 @@ func ReadConfig(filename string) (ServerConfig, error) {
 
 type ServerConfig struct {
 	Bind string                  `hcl:"bind" json:"bind"`
+	TLS  []string                `hcl:"tls" json:"tls"`
 	GRPC bool                    `hcl:"grpc" json:"grpc"`
 	AppM []map[string]*appConfig `hcl:"app" json:"app"`
 	App  []*appConfig            `hcl:"-" json:"-"`

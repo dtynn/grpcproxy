@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -25,12 +26,14 @@ type Server struct {
 	App        []*App
 	middleware []Middleware
 
+	cert    []tls.Certificate
 	bindMap map[string][]*App
 
 	closeCh chan bool
 }
 
 func (this *Server) initialize() {
+	log.Printf("[VERSION] %s", version.String())
 	log.Println("[SERVER INITAILIZE] start")
 	this.closeCh = make(chan bool, 1)
 
@@ -49,6 +52,17 @@ func (this *Server) initialize() {
 
 func (this *Server) build() error {
 	log.Println("[SERVER BUILD] start")
+
+	if len(this.cfg.TLS) == 2 {
+		cert, err := tls.LoadX509KeyPair(this.cfg.TLS[0], this.cfg.TLS[1])
+		if err != nil {
+			return fmt.Errorf("[SERVER BUILD ERROR] load cert files: %s", err)
+		}
+
+		this.cert = []tls.Certificate{cert}
+		log.Printf("[SERVER BUILD] TLS %s loaded", this.cfg.TLS)
+	}
+
 	bindMap := map[string][]*App{}
 
 	for _, app := range this.App {
@@ -89,6 +103,7 @@ func (this *Server) Run() error {
 		lis := &listener{
 			bind: bind,
 			app:  app,
+			srv:  this,
 			stop: stopCh,
 		}
 

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"crypto/tls"
 	"log"
 	"net"
 	"net/http"
@@ -12,21 +13,34 @@ import (
 type listener struct {
 	bind string
 	app  []*App
+	srv  *Server
+
 	stop chan bool
 }
 
 func (this *listener) run(wg *sync.WaitGroup, errCh chan<- error) {
 	defer wg.Done()
 
-	lis, err := net.Listen("tcp", this.bind)
+	var lis net.Listener
+	var err error
+
+	if len(this.srv.cert) == 0 {
+		lis, err = net.Listen("tcp", this.bind)
+
+	} else {
+		lis, err = tls.Listen("tcp", this.bind, &tls.Config{
+			Certificates: this.srv.cert,
+		})
+	}
+
 	if err != nil {
 		errCh <- err
 		return
 	}
 
-	log.Printf("[LISTEN] %d apps listen on %q", len(this.app), this.bind)
-
 	defer lis.Close()
+
+	log.Printf("[LISTENER] %d apps listen on %q with TLS %v", len(this.app), this.bind, len(this.srv.cert) != 0)
 
 	srv := &http2.Server{}
 	opts := &http2.ServeConnOpts{
