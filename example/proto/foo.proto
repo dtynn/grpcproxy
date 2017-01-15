@@ -1,0 +1,16 @@
+syntax = "proto3";
+package rpc;
+
+service Foo {
+    rpc Chat(FooReq) returns (FooResp);
+}
+
+// ---------------------------------------------------------------------------
+
+message FooReq {
+    string hello = 1;
+}
+
+message FooResp {
+    string world = 1;
+}

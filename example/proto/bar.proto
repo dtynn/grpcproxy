@@ -1,0 +1,16 @@
+syntax = "proto3";
+package rpc;
+
+service Bar {
+    rpc Talk(BarReq) returns (BarResp);
+}
+
+// ---------------------------------------------------------------------------
+
+message BarReq {
+    string say = 1;
+}
+
+message BarResp {
+    string hear = 1;
+}
