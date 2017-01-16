@@ -33,7 +33,7 @@ gproxy call "localhost:8000" bar testerror
 ```
 
 ##### TODO
-- TLS support for both frontend and backend
+- TLS support for both frontend and backend ✅
 - load balance policies
 - failure policies
 - log options
