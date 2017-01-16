@@ -230,11 +230,11 @@ func (s *server) manage() {
 			// close current idle connections right away
 			for c, cs := range conns {
 				if cs == http.StateIdle {
-					c.Close()
-
-					go func(c net.Conn) {
-						s.closed <- c
-					}(c)
+					if err := c.Close(); isUseOfClosedError(err) {
+						go func(c net.Conn) {
+							s.closed <- c
+						}(c)
+					}
 				}
 			}
 
