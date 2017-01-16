@@ -4,10 +4,11 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
-	"net"
+	// "net"
 	"net/http"
 
 	// "github.com/facebookgo/grace/gracehttp"
+	"github.com/dtynn/grpcproxy/h2grace/h2gracehttp"
 	"golang.org/x/net/http2"
 )
 
@@ -96,13 +97,11 @@ func (this *Server) Run() error {
 		return err
 	}
 
-	for bind, apps := range this.bindMap {
-		lis, err := net.Listen("tcp", bind)
-		if err != nil {
-			return err
-		}
+	servers := make([]*h2gracehttp.Server, 0, len(this.bindMap))
 
+	for bind, apps := range this.bindMap {
 		srv := &http.Server{}
+		srv.Addr = bind
 		srv.Handler = newProxyHandler(apps)
 
 		if len(this.cert) > 0 {
@@ -115,22 +114,22 @@ func (this *Server) Run() error {
 		http2.ConfigureServer(srv, nil)
 
 		h2Server := &http2.Server{}
-		h2SrvOpt := &http2.ServeConnOpts{
+		h2SvrOpt := &http2.ServeConnOpts{
 			BaseConfig: srv,
 		}
 
-		go func(lis net.Listener, srv *http2.Server, opts *http2.ServeConnOpts) {
-			conn, err := lis.Accept()
-			if err != nil {
-				log.Fatalln(err)
-			}
+		servers = append(servers, h2gracehttp.NewServer(h2Server, h2SvrOpt))
 
-			srv.ServeConn(conn, opts)
-		}(lis, h2Server, h2SrvOpt)
+		// go func(lis net.Listener, srv *http2.Server, opts *http2.ServeConnOpts) {
+		// 	conn, err := lis.Accept()
+		// 	if err != nil {
+		// 		log.Fatalln(err)
+		// 	}
+
+		// 	srv.ServeConn(conn, opts)
+		// }(lis, h2Server, h2SvrOpt)
 	}
 
-	ch := make(chan bool)
-	<-ch
-
-	return nil
+	h := h2gracehttp.NewHTTP2()
+	return h2gracehttp.Serve(h, true, servers...)
 }
