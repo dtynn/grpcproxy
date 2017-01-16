@@ -30,6 +30,7 @@ func (this *listener) run(wg *sync.WaitGroup, errCh chan<- error) {
 	} else {
 		lis, err = tls.Listen("tcp", this.bind, &tls.Config{
 			Certificates: this.srv.cert,
+			NextProtos:   []string{"h2"},
 		})
 	}
 
