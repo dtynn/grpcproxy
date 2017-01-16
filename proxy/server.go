@@ -1,10 +1,15 @@
 package proxy
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
+	// "net"
 	"net/http"
-	"sync"
+
+	// "github.com/facebookgo/grace/gracehttp"
+	"github.com/dtynn/grpcproxy/h2grace/h2gracehttp"
+	"golang.org/x/net/http2"
 )
 
 type Middleware func(handler http.Handler) http.Handler
@@ -25,14 +30,13 @@ type Server struct {
 	App        []*App
 	middleware []Middleware
 
+	cert    []tls.Certificate
 	bindMap map[string][]*App
-
-	closeCh chan bool
 }
 
 func (this *Server) initialize() {
+	log.Printf("[VERSION] %s", version.String())
 	log.Println("[SERVER INITAILIZE] start")
-	this.closeCh = make(chan bool, 1)
 
 	for _, appCfg := range this.cfg.App {
 		app := &App{
@@ -49,6 +53,17 @@ func (this *Server) initialize() {
 
 func (this *Server) build() error {
 	log.Println("[SERVER BUILD] start")
+
+	if len(this.cfg.TLS) == 2 {
+		cert, err := tls.LoadX509KeyPair(this.cfg.TLS[0], this.cfg.TLS[1])
+		if err != nil {
+			return fmt.Errorf("[SERVER BUILD ERROR] load cert files: %s", err)
+		}
+
+		this.cert = []tls.Certificate{cert}
+		log.Printf("[SERVER BUILD] TLS %s loaded", this.cfg.TLS)
+	}
+
 	bindMap := map[string][]*App{}
 
 	for _, app := range this.App {
@@ -82,51 +97,39 @@ func (this *Server) Run() error {
 		return err
 	}
 
-	listeners := make([]*listener, 0, len(this.bindMap))
+	servers := make([]*h2gracehttp.Server, 0, len(this.bindMap))
 
-	for bind, app := range this.bindMap {
-		stopCh := make(chan bool, 1)
-		lis := &listener{
-			bind: bind,
-			app:  app,
-			stop: stopCh,
+	for bind, apps := range this.bindMap {
+		srv := &http.Server{}
+		srv.Addr = bind
+		srv.Handler = newProxyHandler(apps)
+
+		if len(this.cert) > 0 {
+			srv.TLSConfig = &tls.Config{
+				Certificates: this.cert,
+				NextProtos:   []string{http2.NextProtoTLS},
+			}
 		}
 
-		listeners = append(listeners, lis)
-	}
+		http2.ConfigureServer(srv, nil)
 
-	errCh := make(chan error)
-	var wg sync.WaitGroup
-
-	for _, lis := range listeners {
-		wg.Add(1)
-
-		go func(lis *listener, wg *sync.WaitGroup, errCh chan<- error) {
-			lis.run(wg, errCh)
-		}(lis, &wg, errCh)
-	}
-
-	var err error
-
-	for {
-		select {
-		case err = <-errCh:
-			break
-
-		case <-this.closeCh:
-			break
+		h2Server := &http2.Server{}
+		h2SvrOpt := &http2.ServeConnOpts{
+			BaseConfig: srv,
 		}
+
+		servers = append(servers, h2gracehttp.NewServer(h2Server, h2SvrOpt))
+
+		// go func(lis net.Listener, srv *http2.Server, opts *http2.ServeConnOpts) {
+		// 	conn, err := lis.Accept()
+		// 	if err != nil {
+		// 		log.Fatalln(err)
+		// 	}
+
+		// 	srv.ServeConn(conn, opts)
+		// }(lis, h2Server, h2SvrOpt)
 	}
 
-	for _, lis := range listeners {
-		close(lis.stop)
-	}
-
-	wg.Wait()
-
-	return err
-}
-
-func (this *Server) Close() {
-	close(this.closeCh)
+	h := h2gracehttp.NewHTTP2()
+	return h2gracehttp.Serve(h, true, servers...)
 }

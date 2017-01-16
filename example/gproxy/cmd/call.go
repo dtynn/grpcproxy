@@ -22,6 +22,9 @@ import (
 	"github.com/dtynn/grpcproxy/example/gproxy/client"
 )
 
+var cert string
+var hostname string
+
 // callCmd represents the call command
 var callCmd = &cobra.Command{
 	Use:   "call",
@@ -34,13 +37,15 @@ var callCmd = &cobra.Command{
 		}
 
 		log.Println("calling", args)
-		if err := client.Call(args[1], args[0], args[2]); err != nil {
+		if err := client.Call(args[1], args[0], args[2], cert, hostname); err != nil {
 			log.Fatal("got error", err)
 		}
 	},
 }
 
 func init() {
+	callCmd.Flags().StringVarP(&cert, "cert", "", "", "cert file localtion")
+	callCmd.Flags().StringVarP(&cert, "host", "", "", "hostname")
 	RootCmd.AddCommand(callCmd)
 	// Here you will define your flags and configuration settings.
 

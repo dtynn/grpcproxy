@@ -1,10 +1,10 @@
 package client
 
-var callers = map[string]func(host, arg string) error{
+var callers = map[string]func(host, arg, cert, hostname string) error{
 	"foo": Foo,
 	"bar": Bar,
 }
 
-func Call(name, host, arg string) error {
-	return callers[name](host, arg)
+func Call(name, host, arg, cert, hostname string) error {
+	return callers[name](host, arg, cert, hostname)
 }
