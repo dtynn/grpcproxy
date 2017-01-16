@@ -103,6 +103,8 @@ func (this *Server) Run() error {
 		}
 
 		srv := &http.Server{}
+		srv.Handler = newProxyHandler(apps)
+
 		if len(this.cert) > 0 {
 			srv.TLSConfig = &tls.Config{
 				Certificates: this.cert,
@@ -115,11 +117,6 @@ func (this *Server) Run() error {
 		h2Server := &http2.Server{}
 		h2SrvOpt := &http2.ServeConnOpts{
 			BaseConfig: srv,
-			Handler:    defaultHandler,
-		}
-
-		if len(apps) > 0 {
-			h2SrvOpt.Handler = newProxyHandler(apps)
 		}
 
 		go func(lis net.Listener, srv *http2.Server, opts *http2.ServeConnOpts) {
