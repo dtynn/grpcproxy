@@ -19,7 +19,7 @@ func ReadConfig(filename string) (ServerConfig, error) {
 
 type ServerConfig struct {
 	Bind string                  `hcl:"bind" json:"bind"`
-	TLS  []string                `hcl:"tls" json:"tls"`
+	Cert []string                `hcl:"cert" json:"cert"`
 	GRPC bool                    `hcl:"grpc" json:"grpc"`
 	AppM []map[string]*appConfig `hcl:"app" json:"app"`
 	App  []*appConfig            `hcl:"-" json:"-"`
@@ -106,6 +106,7 @@ type proxyConfig struct {
 	GRPC    *bool  `hcl:"grpc" json:"grpc"`
 	Backend string `hcl:"backend" json:"backend"`
 	Policy  string `hcl:"policy" json:"policy"`
+	TLS     bool   `hcl:"tls" json:"tls"`
 }
 
 func (this *proxyConfig) GetGRPC() bool {

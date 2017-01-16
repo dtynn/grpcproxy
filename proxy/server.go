@@ -54,14 +54,14 @@ func (this *Server) initialize() {
 func (this *Server) build() error {
 	log.Println("[SERVER BUILD] start")
 
-	if len(this.cfg.TLS) == 2 {
-		cert, err := tls.LoadX509KeyPair(this.cfg.TLS[0], this.cfg.TLS[1])
+	if len(this.cfg.Cert) == 2 {
+		cert, err := tls.LoadX509KeyPair(this.cfg.Cert[0], this.cfg.Cert[1])
 		if err != nil {
 			return fmt.Errorf("[SERVER BUILD ERROR] load cert files: %s", err)
 		}
 
 		this.cert = []tls.Certificate{cert}
-		log.Printf("[SERVER BUILD] TLS %s loaded", this.cfg.TLS)
+		log.Printf("[SERVER BUILD] cert %s loaded", this.cfg.Cert)
 	}
 
 	bindMap := map[string][]*App{}

@@ -29,6 +29,7 @@ type ReverseProxyBackend struct {
 
 type ReverseProxy struct {
 	policy    string
+	tls       bool
 	backends  []*ReverseProxyBackend
 	transport *proxyTransport
 }
@@ -37,13 +38,14 @@ func buildReverseProxy(p *Proxy) (*ReverseProxy, error) {
 	// reverse proxy
 	revr := &ReverseProxy{
 		policy: p.cfg.Policy,
+		tls:    p.cfg.TLS,
 	}
 
 	// transport
 	transport := &proxyTransport{
 		grpc: p.GRPC(),
 		transport: &http2.Transport{
-			AllowHTTP: true,
+			AllowHTTP: !revr.tls,
 			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
 				return net.Dial(network, addr)
 			},
@@ -90,7 +92,11 @@ func buildReverseProxy(p *Proxy) (*ReverseProxy, error) {
 		}
 
 		if target.Scheme == "" {
-			target.Scheme = "http"
+			if revr.tls {
+				target.Scheme = "https"
+			} else {
+				target.Scheme = "http"
+			}
 		}
 
 		rvProxy := httputil.NewSingleHostReverseProxy(target)
@@ -153,8 +159,8 @@ func (this *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error)
 		}
 
 		resp.Trailer = http.Header{}
-		resp.Trailer.Set("Grpc-Status", status)
-		resp.Trailer.Set("Grpc-Message", message)
+		resp.Trailer.Set(grpcStatusHeader, status)
+		resp.Trailer.Set(grpcMessageHeader, message)
 	}
 
 	return resp, err
