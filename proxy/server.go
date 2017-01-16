@@ -4,8 +4,11 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
-	"sync"
+
+	// "github.com/facebookgo/grace/gracehttp"
+	"golang.org/x/net/http2"
 )
 
 type Middleware func(handler http.Handler) http.Handler
@@ -28,14 +31,11 @@ type Server struct {
 
 	cert    []tls.Certificate
 	bindMap map[string][]*App
-
-	closeCh chan bool
 }
 
 func (this *Server) initialize() {
 	log.Printf("[VERSION] %s", version.String())
 	log.Println("[SERVER INITAILIZE] start")
-	this.closeCh = make(chan bool, 1)
 
 	for _, appCfg := range this.cfg.App {
 		app := &App{
@@ -96,52 +96,44 @@ func (this *Server) Run() error {
 		return err
 	}
 
-	listeners := make([]*listener, 0, len(this.bindMap))
-
-	for bind, app := range this.bindMap {
-		stopCh := make(chan bool, 1)
-		lis := &listener{
-			bind: bind,
-			app:  app,
-			srv:  this,
-			stop: stopCh,
+	for bind, apps := range this.bindMap {
+		lis, err := net.Listen("tcp", bind)
+		if err != nil {
+			return err
 		}
 
-		listeners = append(listeners, lis)
-	}
-
-	errCh := make(chan error)
-	var wg sync.WaitGroup
-
-	for _, lis := range listeners {
-		wg.Add(1)
-
-		go func(lis *listener, wg *sync.WaitGroup, errCh chan<- error) {
-			lis.run(wg, errCh)
-		}(lis, &wg, errCh)
-	}
-
-	var err error
-
-	for {
-		select {
-		case err = <-errCh:
-			break
-
-		case <-this.closeCh:
-			break
+		srv := &http.Server{}
+		if len(this.cert) > 0 {
+			srv.TLSConfig = &tls.Config{
+				Certificates: this.cert,
+				NextProtos:   []string{http2.NextProtoTLS},
+			}
 		}
+
+		http2.ConfigureServer(srv, nil)
+
+		h2Server := &http2.Server{}
+		h2SrvOpt := &http2.ServeConnOpts{
+			BaseConfig: srv,
+			Handler:    defaultHandler,
+		}
+
+		if len(apps) > 0 {
+			h2SrvOpt.Handler = newProxyHandler(apps)
+		}
+
+		go func(lis net.Listener, srv *http2.Server, opts *http2.ServeConnOpts) {
+			conn, err := lis.Accept()
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			srv.ServeConn(conn, opts)
+		}(lis, h2Server, h2SrvOpt)
 	}
 
-	for _, lis := range listeners {
-		close(lis.stop)
-	}
+	ch := make(chan bool)
+	<-ch
 
-	wg.Wait()
-
-	return err
-}
-
-func (this *Server) Close() {
-	close(this.closeCh)
+	return nil
 }

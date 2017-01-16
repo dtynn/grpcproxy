@@ -21,22 +21,18 @@ type listener struct {
 func (this *listener) run(wg *sync.WaitGroup, errCh chan<- error) {
 	defer wg.Done()
 
-	var lis net.Listener
-	var err error
-
-	if len(this.srv.cert) == 0 {
-		lis, err = net.Listen("tcp", this.bind)
-
-	} else {
-		lis, err = tls.Listen("tcp", this.bind, &tls.Config{
-			Certificates: this.srv.cert,
-			NextProtos:   []string{"h2"},
-		})
-	}
+	lis, err := net.Listen("tcp", this.bind)
 
 	if err != nil {
 		errCh <- err
 		return
+	}
+
+	if len(this.srv.cert) != 0 {
+		lis = tls.NewListener(lis, &tls.Config{
+			Certificates: this.srv.cert,
+			NextProtos:   []string{"h2"},
+		})
 	}
 
 	defer lis.Close()
