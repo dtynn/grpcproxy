@@ -37,6 +37,11 @@ func TestStr2NonEmptySlice(t *testing.T) {
 			`,
 			[]string{":8001", ":8002"},
 		},
+		{
+			`:8001,
+:8002,`,
+			[]string{":8001", ":8002"},
+		},
 	}
 
 	for i, c := range testcases {
