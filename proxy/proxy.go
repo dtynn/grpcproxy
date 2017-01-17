@@ -22,23 +22,13 @@ type Proxy struct {
 
 func (this *Proxy) initialize() {
 	if host := this.cfg.Host; host != "" {
-		for _, one := range strings.Split(host, Sep) {
-			one = strings.TrimSpace(one)
-			if one == "" {
-				continue
-			}
-
+		for _, one := range str2NonEmptySlice(host, Sep) {
 			log.Printf("[PROXY][%s] host pattern %q added", this.Name(), one)
 			this.hostPattern = append(this.hostPattern, glob.MustCompile(one))
 		}
 	}
 
-	for _, one := range strings.Split(this.cfg.URI, Sep) {
-		one = strings.TrimSpace(one)
-		if one == "" {
-			continue
-		}
-
+	for _, one := range str2NonEmptySlice(this.cfg.URI, Sep) {
 		if !strings.HasSuffix(one, Wildcard) {
 			one = one + Wildcard
 		}
