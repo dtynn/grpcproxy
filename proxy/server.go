@@ -4,10 +4,9 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
-	// "net"
 	"net/http"
+	"time"
 
-	// "github.com/facebookgo/grace/gracehttp"
 	"github.com/dtynn/grpcproxy/h2grace/h2gracehttp"
 	"golang.org/x/net/http2"
 )
@@ -71,7 +70,9 @@ func (this *Server) build() error {
 			return fmt.Errorf("[APP BUILD ERROR] %s", err)
 		}
 
-		bindMap[app.Bind()] = append(bindMap[app.Bind()], app)
+		for _, bind := range app.Bind() {
+			bindMap[bind] = append(bindMap[bind], app)
+		}
 	}
 
 	this.bindMap = bindMap
@@ -131,5 +132,7 @@ func (this *Server) Run() error {
 	}
 
 	h := h2gracehttp.NewHTTP2()
+	h.StopTimeout = 2 * time.Second
+	h.KillTimeout = 5 * time.Second
 	return h2gracehttp.Serve(h, true, servers...)
 }
