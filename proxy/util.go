@@ -5,8 +5,10 @@ import (
 )
 
 func str2NonEmptySlice(s, sep string) []string {
-	pieces := strings.Split(s, sep)
+	return nonEmptySlice(strings.Split(s, sep))
+}
 
+func nonEmptySlice(pieces []string) []string {
 	i := 0
 	for i < len(pieces) {
 		part := strings.TrimSpace(pieces[i])
@@ -18,6 +20,5 @@ func str2NonEmptySlice(s, sep string) []string {
 		pieces[i] = part
 		i += 1
 	}
-
 	return pieces
 }

@@ -101,6 +101,7 @@ func (this *Server) Run() error {
 	servers := make([]*h2gracehttp.Server, 0, len(this.bindMap))
 
 	for bind, apps := range this.bindMap {
+		log.Printf("[REVERSE] %d apps on %s", len(apps), bind)
 		srv := &http.Server{}
 		srv.Addr = bind
 		srv.Handler = newProxyHandler(apps)

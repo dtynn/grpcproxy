@@ -76,7 +76,7 @@ func (this *App) matchHost(req *http.Request) bool {
 }
 
 func (this *App) Bind() []string {
-	return str2NonEmptySlice(this.cfg.GetBind(), Sep)
+	return nonEmptySlice(this.cfg.GetBind())
 }
 
 func (this *App) Name() string {

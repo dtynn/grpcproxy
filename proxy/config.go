@@ -18,7 +18,7 @@ func ReadConfig(filename string) (ServerConfig, error) {
 }
 
 type ServerConfig struct {
-	Bind string                  `hcl:"bind" json:"bind"`
+	Bind []string                `hcl:"bind" json:"bind"`
 	Cert []string                `hcl:"cert" json:"cert"`
 	GRPC bool                    `hcl:"grpc" json:"grpc"`
 	AppM []map[string]*appConfig `hcl:"app" json:"app"`
@@ -60,18 +60,18 @@ type appConfig struct {
 
 	Name   string                    `hcl:"-" json:"-"`
 	Host   string                    `hcl:"host" json:"host"`
-	Bind   *string                   `hcl:"bind" json:"bind"`
+	Bind   []string                  `hcl:"bind" json:"bind"`
 	GRPC   *bool                     `hcl:"grpc" json:"grpc"`
 	ProxyM []map[string]*proxyConfig `hcl:"proxy" json:"proxy"`
 	Proxy  []*proxyConfig            `hcl:"-" json:"-"`
 }
 
-func (this *appConfig) GetBind() string {
-	if this.Bind == nil {
+func (this *appConfig) GetBind() []string {
+	if len(this.Bind) == 0 {
 		return this.server.Bind
 	}
 
-	return *this.Bind
+	return this.Bind
 }
 
 func (this *appConfig) GetGRPC() bool {
