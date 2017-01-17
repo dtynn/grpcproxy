@@ -246,6 +246,9 @@ func (s *server) manage() {
 			stats.BumpSum(s.stats, "kill.conn.count", float64(len(conns)))
 			for c := range conns {
 				c.Close()
+				go func(c net.Conn) {
+					s.closed <- c
+				}(c)
 			}
 
 			// don't block the kill.
