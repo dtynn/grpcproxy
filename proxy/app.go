@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/gobwas/glob"
 )
@@ -22,12 +21,7 @@ func (this *App) initialize() {
 	// init host
 	host := this.cfg.Host
 
-	for _, one := range strings.Split(host, Sep) {
-		one = strings.TrimSpace(one)
-		if one == "" {
-			continue
-		}
-
+	for _, one := range str2NonEmptySlice(host, Sep) {
 		this.hostPattern = append(this.hostPattern, glob.MustCompile(one))
 		log.Printf("[APP][%s] host pattern %q added", this.Name(), one)
 	}

@@ -57,10 +57,10 @@ func buildReverseProxy(p *Proxy) (*ReverseProxy, error) {
 	// build backends
 	backends := make([]*ReverseProxyBackend, 0)
 
-	for _, back := range strings.Split(p.cfg.Backend, Sep) {
+	for _, back := range str2NonEmptySlice(p.cfg.Backend, Sep) {
 		weight := 1
 
-		if pieces := strings.Split(back, ";"); len(pieces) == 2 {
+		if pieces := str2NonEmptySlice(back, ";"); len(pieces) == 2 {
 			back = pieces[0]
 			if w, _ := strconv.Atoi(strings.TrimSpace(pieces[1])); w != 0 {
 				weight = w
