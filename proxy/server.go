@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	"golang.org/x/net/http2"
 )
@@ -101,9 +105,9 @@ func (this *Server) Run() error {
 
 	listeners := make([]*listener, 0, len(this.bindMap))
 	errCh := make(chan error, len(this.bindMap))
+	var wg sync.WaitGroup
 
 	for bind, apps := range this.bindMap {
-		log.Printf("[REVERSE] %d apps on %s", len(apps), bind)
 		svr := &http.Server{}
 		svr.Addr = bind
 		svr.Handler = newProxyHandler(apps)
@@ -114,29 +118,50 @@ func (this *Server) Run() error {
 			}
 		}
 
-		listener := newListener(svr, errCh)
+		wg.Add(1)
+		listener := newListener(svr, &wg, errCh)
 		listeners = append(listeners, listener)
 		go listener.run()
 	}
 
-	defer func(listeners []*listener) {
-		for _, l := range listeners {
-			l.close()
-		}
-	}(listeners)
+	go this.signalHandler()
+	var err error
 
 	select {
-	case err := <-errCh:
+	case err = <-errCh:
 		return err
 
 	case <-this.closeCh:
 
 	}
 
-	log.Printf("[SERVER] closed")
-	return nil
+	for i, _ := range listeners {
+		listeners[i].close()
+	}
+
+	wg.Wait()
+
+	log.Printf("[SERVER] shutdown")
+	return err
 }
 
 func (this *Server) Close() {
 	close(this.closeCh)
+}
+
+func (this *Server) signalHandler() {
+	ch := make(chan os.Signal, 10)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR2)
+	for {
+		sig := <-ch
+		switch sig {
+		case syscall.SIGINT, syscall.SIGTERM:
+			// this ensures a subsequent INT/TERM will trigger standard go behaviour of
+			// terminating.
+			log.Printf("[SERVER] got signal %s", sig)
+			signal.Stop(ch)
+			this.Close()
+			return
+		}
+	}
 }
