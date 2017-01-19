@@ -7,7 +7,7 @@ import (
 var version = Version{
 	Majar: 0,
 	Minor: 1,
-	Patch: 6,
+	Patch: 7,
 }
 
 type Version struct {

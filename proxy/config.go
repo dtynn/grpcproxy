@@ -100,13 +100,14 @@ func (this *appConfig) link() {
 type proxyConfig struct {
 	app *appConfig
 
-	Name    string `hcl:"-" json:"-"`
-	URI     string `hcl:"uri" json:"uri"`
-	Host    string `hcl:"host" json:"host"`
-	GRPC    *bool  `hcl:"grpc" json:"grpc"`
-	Backend string `hcl:"backend" json:"backend"`
-	Policy  string `hcl:"policy" json:"policy"`
-	TLS     bool   `hcl:"tls" json:"tls"`
+	Name               string `hcl:"-" json:"-"`
+	URI                string `hcl:"uri" json:"uri"`
+	Host               string `hcl:"host" json:"host"`
+	GRPC               *bool  `hcl:"grpc" json:"grpc"`
+	Backend            string `hcl:"backend" json:"backend"`
+	Policy             string `hcl:"policy" json:"policy"`
+	TLS                bool   `hcl:"tls" json:"tls"`
+	InsecureSkipVerify bool   `hcl:"insecure_skip_verify" json:"insecure_skip_verify"`
 }
 
 func (this *proxyConfig) GetGRPC() bool {

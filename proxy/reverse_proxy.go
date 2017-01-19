@@ -29,30 +29,39 @@ type ReverseProxyBackend struct {
 
 type ReverseProxy struct {
 	policy    string
-	tls       bool
 	backends  []*ReverseProxyBackend
 	transport *proxyTransport
 }
 
 func buildReverseProxy(p *Proxy) (*ReverseProxy, error) {
-	// reverse proxy
-	revr := &ReverseProxy{
-		policy: p.cfg.Policy,
-		tls:    p.cfg.TLS,
-	}
+	tlsOn := p.cfg.TLS
 
-	// transport
-	transport := &proxyTransport{
-		grpc: p.GRPC(),
-		transport: &http2.Transport{
-			AllowHTTP: !revr.tls,
-			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-				return net.Dial(network, addr)
-			},
+	t2 := &http2.Transport{
+		AllowHTTP: !tlsOn,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: p.cfg.InsecureSkipVerify,
+		},
+		DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
+			conn, err := net.Dial(network, addr)
+			if err != nil {
+				return nil, err
+			}
+
+			if tlsOn {
+				conn = tls.Client(conn, cfg)
+			}
+			return conn, nil
 		},
 	}
 
-	revr.transport = transport
+	// reverse proxy
+	revr := &ReverseProxy{
+		policy: p.cfg.Policy,
+		transport: &proxyTransport{
+			grpc:      p.GRPC(),
+			transport: t2,
+		},
+	}
 
 	// build backends
 	backends := make([]*ReverseProxyBackend, 0)
@@ -92,7 +101,7 @@ func buildReverseProxy(p *Proxy) (*ReverseProxy, error) {
 		}
 
 		if target.Scheme == "" {
-			if revr.tls {
+			if tlsOn {
 				target.Scheme = "https"
 			} else {
 				target.Scheme = "http"
@@ -100,7 +109,7 @@ func buildReverseProxy(p *Proxy) (*ReverseProxy, error) {
 		}
 
 		rvProxy := httputil.NewSingleHostReverseProxy(target)
-		rvProxy.Transport = transport
+		rvProxy.Transport = revr.transport
 
 		backends = append(backends, &ReverseProxyBackend{
 			backUrl: back,
@@ -141,7 +150,7 @@ func (this *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 type proxyTransport struct {
 	grpc      bool
-	transport *http2.Transport
+	transport http.RoundTripper
 }
 
 func (this *proxyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
