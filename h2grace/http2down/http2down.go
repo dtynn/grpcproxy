@@ -5,7 +5,9 @@
 package http2down
 
 import (
+	"crypto/tls"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -264,13 +266,29 @@ func (s *server) manage() {
 func (s *server) serve() {
 	stats.BumpSum(s.stats, "serve", 1)
 	for {
+		log.Printf("waiting for connection")
 		conn, err := s.listener.Accept()
 		if err != nil {
 			s.serveErr <- err
 			break
 		}
 
+		log.Printf("incoming connection")
+
+		if s.serverConnOpt.BaseConfig.TLSConfig != nil {
+			tlsConn := tls.Server(conn, s.serverConnOpt.BaseConfig.TLSConfig)
+			tlsConn.Close()
+			if err := tlsConn.Handshake(); err != nil {
+				log.Printf("handshake error %s", err)
+				conn.Close()
+				continue
+			}
+
+			conn = tlsConn
+		}
+
 		s.server.ServeConn(conn, s.serverConnOpt)
+		log.Printf("serve conn done")
 	}
 
 	close(s.serveDone)

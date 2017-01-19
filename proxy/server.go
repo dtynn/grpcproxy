@@ -5,22 +5,21 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 
-	"github.com/dtynn/grpcproxy/h2grace/h2gracehttp"
 	"golang.org/x/net/http2"
 )
 
 type Middleware func(handler http.Handler) http.Handler
 
 func NewServer(cfg ServerConfig) *Server {
-	srv := &Server{
-		cfg: cfg,
+	svr := &Server{
+		cfg:     cfg,
+		closeCh: make(chan struct{}, 1),
 	}
 
-	srv.initialize()
+	svr.initialize()
 
-	return srv
+	return svr
 }
 
 type Server struct {
@@ -31,6 +30,8 @@ type Server struct {
 
 	cert    []tls.Certificate
 	bindMap map[string][]*App
+
+	closeCh chan struct{}
 }
 
 func (this *Server) initialize() {
@@ -98,42 +99,44 @@ func (this *Server) Run() error {
 		return err
 	}
 
-	servers := make([]*h2gracehttp.Server, 0, len(this.bindMap))
+	listeners := make([]*listener, 0, len(this.bindMap))
+	errCh := make(chan error, len(this.bindMap))
 
 	for bind, apps := range this.bindMap {
 		log.Printf("[REVERSE] %d apps on %s", len(apps), bind)
-		srv := &http.Server{}
-		srv.Addr = bind
-		srv.Handler = newProxyHandler(apps)
-
+		svr := &http.Server{}
+		svr.Addr = bind
+		svr.Handler = newProxyHandler(apps)
 		if len(this.cert) > 0 {
-			srv.TLSConfig = &tls.Config{
+			svr.TLSConfig = &tls.Config{
 				Certificates: this.cert,
 				NextProtos:   []string{http2.NextProtoTLS},
 			}
 		}
 
-		http2.ConfigureServer(srv, nil)
-
-		h2Server := &http2.Server{}
-		h2SvrOpt := &http2.ServeConnOpts{
-			BaseConfig: srv,
-		}
-
-		servers = append(servers, h2gracehttp.NewServer(h2Server, h2SvrOpt))
-
-		// go func(lis net.Listener, srv *http2.Server, opts *http2.ServeConnOpts) {
-		// 	conn, err := lis.Accept()
-		// 	if err != nil {
-		// 		log.Fatalln(err)
-		// 	}
-
-		// 	srv.ServeConn(conn, opts)
-		// }(lis, h2Server, h2SvrOpt)
+		listener := newListener(svr, errCh)
+		listeners = append(listeners, listener)
+		go listener.run()
 	}
 
-	h := h2gracehttp.NewHTTP2()
-	h.StopTimeout = 2 * time.Second
-	h.KillTimeout = 5 * time.Second
-	return h2gracehttp.Serve(h, true, servers...)
+	defer func(listeners []*listener) {
+		for _, l := range listeners {
+			l.close()
+		}
+	}(listeners)
+
+	select {
+	case err := <-errCh:
+		return err
+
+	case <-this.closeCh:
+
+	}
+
+	log.Printf("[SERVER] closed")
+	return nil
+}
+
+func (this *Server) Close() {
+	close(this.closeCh)
 }
