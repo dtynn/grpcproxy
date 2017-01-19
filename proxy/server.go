@@ -129,7 +129,6 @@ func (this *Server) Run() error {
 
 	select {
 	case err = <-errCh:
-		return err
 
 	case <-this.closeCh:
 
