@@ -21,6 +21,7 @@ import (
 
 	"github.com/dtynn/grpcproxy/config"
 	"github.com/dtynn/grpcproxy/service"
+	"github.com/dtynn/grpcproxy/version"
 )
 
 // runCmd represents the run command
@@ -29,6 +30,8 @@ var runCmd = &cobra.Command{
 	Short: "run grpcproxy server",
 	Long:  `run grpcproxy server with the given config file, default "./example.conf"`,
 	Run: func(cmd *cobra.Command, args []string) {
+		log.Printf("[GRPCPROXY] version %s", version.Version())
+
 		if cfgFile == "" {
 			cfgFile = "./example.conf"
 		}
