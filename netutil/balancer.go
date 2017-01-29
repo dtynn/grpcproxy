@@ -5,5 +5,5 @@ import (
 )
 
 type Balancer interface {
-	Pick() http.Handler
+	Pick(req *http.Request) http.Handler
 }
