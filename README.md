@@ -34,7 +34,7 @@ gproxy call "localhost:8000" bar testerror
 
 ##### TODO
 - TLS support for both frontend and backend ✅
-- load balance policies
+- load balance policies ✅
 - failure policies
 - log options
 - test grpc streaming request
