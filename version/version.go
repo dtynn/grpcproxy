@@ -11,7 +11,7 @@ func Version() *version {
 var v = &version{
 	major: 0,
 	minor: 2,
-	patch: 0,
+	patch: 1,
 }
 
 type version struct {
