@@ -19,7 +19,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dtynn/grpcproxy/proxy"
+	"github.com/dtynn/grpcproxy/config"
+	"github.com/dtynn/grpcproxy/service"
+	"github.com/dtynn/grpcproxy/version"
 )
 
 // runCmd represents the run command
@@ -28,17 +30,23 @@ var runCmd = &cobra.Command{
 	Short: "run grpcproxy server",
 	Long:  `run grpcproxy server with the given config file, default "./example.conf"`,
 	Run: func(cmd *cobra.Command, args []string) {
+		log.Printf("[GRPCPROXY] version %s", version.Version())
+
 		if cfgFile == "" {
 			cfgFile = "./example.conf"
 		}
 
-		cfg, err := proxy.ReadConfig(cfgFile)
+		cfg, err := config.ReadConfig(cfgFile)
 		if err != nil {
 			log.Fatalf("fail to read config: %s", err)
 		}
 
-		server := proxy.NewServer(cfg)
-		if err := server.Run(); err != nil {
+		svr, err := service.NewService(cfg)
+		if err != nil {
+			log.Fatalf("fail to init service %s", err)
+		}
+
+		if err := svr.Run(); err != nil {
 			log.Fatalf("server failure %s", err)
 		}
 

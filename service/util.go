@@ -1,7 +1,12 @@
-package proxy
+package service
 
 import (
 	"strings"
+)
+
+const (
+	Sep      = ","
+	Wildcard = "*"
 )
 
 func str2NonEmptySlice(s, sep string) []string {

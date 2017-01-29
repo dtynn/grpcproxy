@@ -1,15 +1,9 @@
-package proxy
+package config
 
 import (
 	"io/ioutil"
-	// "sort"
 
 	"github.com/hashicorp/hcl"
-)
-
-const (
-	Sep      = ","
-	Wildcard = "*"
 )
 
 func ReadConfig(filename string) (ServerConfig, error) {
@@ -21,8 +15,8 @@ type ServerConfig struct {
 	Bind []string                `hcl:"bind" json:"bind"`
 	Cert []string                `hcl:"cert" json:"cert"`
 	GRPC bool                    `hcl:"grpc" json:"grpc"`
-	AppM []map[string]*appConfig `hcl:"app" json:"app"`
-	App  []*appConfig            `hcl:"-" json:"-"`
+	AppM []map[string]*AppConfig `hcl:"app" json:"app"`
+	App  []*AppConfig            `hcl:"-" json:"-"`
 }
 
 func (this *ServerConfig) Read(filename string) error {
@@ -55,18 +49,18 @@ func (this *ServerConfig) link() {
 	}
 }
 
-type appConfig struct {
+type AppConfig struct {
 	server *ServerConfig
 
 	Name   string                    `hcl:"-" json:"-"`
 	Host   string                    `hcl:"host" json:"host"`
 	Bind   []string                  `hcl:"bind" json:"bind"`
 	GRPC   *bool                     `hcl:"grpc" json:"grpc"`
-	ProxyM []map[string]*proxyConfig `hcl:"proxy" json:"proxy"`
-	Proxy  []*proxyConfig            `hcl:"-" json:"-"`
+	ProxyM []map[string]*ProxyConfig `hcl:"proxy" json:"proxy"`
+	Proxy  []*ProxyConfig            `hcl:"-" json:"-"`
 }
 
-func (this *appConfig) GetBind() []string {
+func (this *AppConfig) GetBind() []string {
 	if len(this.Bind) == 0 {
 		return this.server.Bind
 	}
@@ -74,7 +68,7 @@ func (this *appConfig) GetBind() []string {
 	return this.Bind
 }
 
-func (this *appConfig) GetGRPC() bool {
+func (this *AppConfig) GetGRPC() bool {
 	if this.GRPC == nil {
 		return this.server.GRPC
 	}
@@ -82,7 +76,7 @@ func (this *appConfig) GetGRPC() bool {
 	return *this.GRPC
 }
 
-func (this *appConfig) link() {
+func (this *AppConfig) link() {
 	for _, m := range this.ProxyM {
 		for name, proxy := range m {
 			proxy.link()
@@ -97,8 +91,8 @@ func (this *appConfig) link() {
 	}
 }
 
-type proxyConfig struct {
-	app *appConfig
+type ProxyConfig struct {
+	app *AppConfig
 
 	Name               string `hcl:"-" json:"-"`
 	URI                string `hcl:"uri" json:"uri"`
@@ -110,7 +104,7 @@ type proxyConfig struct {
 	InsecureSkipVerify bool   `hcl:"insecure_skip_verify" json:"insecure_skip_verify"`
 }
 
-func (this *proxyConfig) GetGRPC() bool {
+func (this *ProxyConfig) GetGRPC() bool {
 	if this.GRPC == nil {
 		return this.app.GetGRPC()
 	}
@@ -118,6 +112,6 @@ func (this *proxyConfig) GetGRPC() bool {
 	return *this.GRPC
 }
 
-func (this *proxyConfig) link() {
+func (this *ProxyConfig) link() {
 
 }
