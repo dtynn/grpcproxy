@@ -93,15 +93,27 @@ func NewProxy(app *App, cfg *config.ProxyConfig) (*Proxy, error) {
 	}
 
 	var balancer netutil.Balancer
+	var err error
 
 	switch cfg.Policy {
-	default:
-		b, err := netutil.Random(backends)
-		if err != nil {
-			return nil, err
-		}
+	case "hash":
+		balancer, err = netutil.Hash(backends)
 
-		balancer = b
+	case "round":
+		balancer, err = netutil.RoundRobin(backends)
+
+	case "random":
+		balancer, err = netutil.Random(backends)
+
+	case "least":
+		balancer, err = netutil.Least(backends)
+
+	default:
+		balancer, err = netutil.Random(backends)
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	log.Printf("[PROXY][%s] use balancer %q", proxy, balancer)
@@ -154,7 +166,7 @@ func (this *Proxy) matchURI(req *http.Request) bool {
 }
 
 func (this *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	h := this.balancer.Pick()
+	h := this.balancer.Pick(req)
 	h.ServeHTTP(rw, req)
 }
 
