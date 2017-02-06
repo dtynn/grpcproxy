@@ -12,10 +12,10 @@ func ReadConfig(filename string) (ServerConfig, error) {
 }
 
 type ServerConfig struct {
-	Bind []string                `hcl:"bind" json:"bind"`
-	Cert []string                `hcl:"cert" json:"cert"`
-	GRPC bool                    `hcl:"grpc" json:"grpc"`
-	AppM []map[string]*AppConfig `hcl:"app" json:"app"`
+	Bind []string                `hcl:"bind,omitempty" json:"bind,omitempty"`
+	Cert []string                `hcl:"cert,omitempty" json:"cert,omitempty"`
+	GRPC bool                    `hcl:"grpc,omitempty" json:"grpc,omitempty"`
+	AppM []map[string]*AppConfig `hcl:"app,omitempty" json:"app,omitempty"`
 	App  []*AppConfig            `hcl:"-" json:"-"`
 }
 
@@ -53,10 +53,10 @@ type AppConfig struct {
 	server *ServerConfig
 
 	Name   string                    `hcl:"-" json:"-"`
-	Host   string                    `hcl:"host" json:"host"`
-	Bind   []string                  `hcl:"bind" json:"bind"`
-	GRPC   *bool                     `hcl:"grpc" json:"grpc"`
-	ProxyM []map[string]*ProxyConfig `hcl:"proxy" json:"proxy"`
+	Host   string                    `hcl:"host,omitempty" json:"host,omitempty"`
+	Bind   []string                  `hcl:"bind,omitempty" json:"bind,omitempty"`
+	GRPC   *bool                     `hcl:"grpc,omitempty" json:"grpc,omitempty"`
+	ProxyM []map[string]*ProxyConfig `hcl:"proxy,omitempty" json:"proxy,omitempty"`
 	Proxy  []*ProxyConfig            `hcl:"-" json:"-"`
 }
 
@@ -95,13 +95,13 @@ type ProxyConfig struct {
 	app *AppConfig
 
 	Name               string `hcl:"-" json:"-"`
-	URI                string `hcl:"uri" json:"uri"`
-	Host               string `hcl:"host" json:"host"`
-	GRPC               *bool  `hcl:"grpc" json:"grpc"`
-	Backend            string `hcl:"backend" json:"backend"`
-	Policy             string `hcl:"policy" json:"policy"`
-	TLS                bool   `hcl:"tls" json:"tls"`
-	InsecureSkipVerify bool   `hcl:"insecure_skip_verify" json:"insecure_skip_verify"`
+	URI                string `hcl:"uri,omitempty" json:"uri,omitempty"`
+	Host               string `hcl:"host,omitempty" json:"host,omitempty"`
+	GRPC               *bool  `hcl:"grpc,omitempty" json:"grpc,omitempty"`
+	Backend            string `hcl:"backend,omitempty" json:"backend,omitempty"`
+	Policy             string `hcl:"policy,omitempty" json:"policy,omitempty"`
+	TLS                bool   `hcl:"tls,omitempty" json:"tls,omitempty"`
+	InsecureSkipVerify bool   `hcl:"insecure_skip_verify,omitempty" json:"insecure_skip_verify,omitempty"`
 }
 
 func (this *ProxyConfig) GetGRPC() bool {
