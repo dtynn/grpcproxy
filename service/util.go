@@ -2,11 +2,13 @@ package service
 
 import (
 	"strings"
+
+	"github.com/dtynn/grpcproxy/config"
 )
 
 const (
-	Sep      = ","
-	Wildcard = "*"
+	Sep      = config.Sep
+	Wildcard = config.Wildcard
 )
 
 func str2NonEmptySlice(s, sep string) []string {
