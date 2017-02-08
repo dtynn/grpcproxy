@@ -29,12 +29,12 @@ func (this *ServerConfig) Read(filename string) error {
 		return err
 	}
 
-	this.link()
+	this.Init()
 
 	return nil
 }
 
-func (this *ServerConfig) link() {
+func (this *ServerConfig) Init() {
 	for _, m := range this.AppM {
 		for name, app := range m {
 			app.link()
