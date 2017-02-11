@@ -14,6 +14,7 @@ func ReadConfig(filename string) (ServerConfig, error) {
 type ServerConfig struct {
 	Bind []string                `hcl:"bind,omitempty" json:"bind,omitempty"`
 	Cert []string                `hcl:"cert,omitempty" json:"cert,omitempty"`
+	CA   []string                `hcl:"ca" json:"ca"`
 	GRPC bool                    `hcl:"grpc,omitempty" json:"grpc,omitempty"`
 	AppM []map[string]*AppConfig `hcl:"app,omitempty" json:"app,omitempty"`
 	App  []*AppConfig            `hcl:"-" json:"-"`
@@ -56,6 +57,7 @@ type AppConfig struct {
 	Host   string                    `hcl:"host,omitempty" json:"host,omitempty"`
 	Bind   []string                  `hcl:"bind,omitempty" json:"bind,omitempty"`
 	GRPC   *bool                     `hcl:"grpc,omitempty" json:"grpc,omitempty"`
+	CA     []string                  `hcl:"ca" json:"ca"`
 	ProxyM []map[string]*ProxyConfig `hcl:"proxy,omitempty" json:"proxy,omitempty"`
 	Proxy  []*ProxyConfig            `hcl:"-" json:"-"`
 }
@@ -76,6 +78,14 @@ func (this *AppConfig) GetGRPC() bool {
 	return *this.GRPC
 }
 
+func (this *AppConfig) GetCA() []string {
+	if len(this.CA) == 0 {
+		return this.server.CA
+	}
+
+	return this.CA
+}
+
 func (this *AppConfig) link() {
 	for _, m := range this.ProxyM {
 		for name, proxy := range m {
@@ -94,14 +104,15 @@ func (this *AppConfig) link() {
 type ProxyConfig struct {
 	app *AppConfig
 
-	Name               string `hcl:"-" json:"-"`
-	URI                string `hcl:"uri,omitempty" json:"uri,omitempty"`
-	Host               string `hcl:"host,omitempty" json:"host,omitempty"`
-	GRPC               *bool  `hcl:"grpc,omitempty" json:"grpc,omitempty"`
-	Backend            string `hcl:"backend,omitempty" json:"backend,omitempty"`
-	Policy             string `hcl:"policy,omitempty" json:"policy,omitempty"`
-	TLS                bool   `hcl:"tls,omitempty" json:"tls,omitempty"`
-	InsecureSkipVerify bool   `hcl:"insecure_skip_verify,omitempty" json:"insecure_skip_verify,omitempty"`
+	Name               string   `hcl:"-" json:"-"`
+	URI                string   `hcl:"uri,omitempty" json:"uri,omitempty"`
+	Host               string   `hcl:"host,omitempty" json:"host,omitempty"`
+	GRPC               *bool    `hcl:"grpc,omitempty" json:"grpc,omitempty"`
+	Backend            string   `hcl:"backend,omitempty" json:"backend,omitempty"`
+	Policy             string   `hcl:"policy,omitempty" json:"policy,omitempty"`
+	CA                 []string `hcl:"ca" json:"ca"`
+	TLS                bool     `hcl:"tls,omitempty" json:"tls,omitempty"`
+	InsecureSkipVerify bool     `hcl:"insecure_skip_verify,omitempty" json:"insecure_skip_verify,omitempty"`
 }
 
 func (this *ProxyConfig) GetGRPC() bool {
@@ -110,6 +121,14 @@ func (this *ProxyConfig) GetGRPC() bool {
 	}
 
 	return *this.GRPC
+}
+
+func (this *ProxyConfig) GetCA() []string {
+	if len(this.CA) == 0 {
+		return this.app.GetCA()
+	}
+
+	return this.CA
 }
 
 func (this *ProxyConfig) link() {

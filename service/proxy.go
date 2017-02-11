@@ -2,7 +2,9 @@ package service
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -53,6 +55,22 @@ func NewProxy(app *App, cfg *config.ProxyConfig) (*Proxy, error) {
 	if cfg.TLS {
 		h2topt.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: cfg.InsecureSkipVerify,
+		}
+
+		if ca := cfg.GetCA(); len(ca) > 0 {
+			caPool := x509.NewCertPool()
+
+			for _, one := range ca {
+				caData, err := ioutil.ReadFile(one)
+				if err != nil {
+					return nil, fmt.Errorf("fail to load ca file at %s: %q", one, err)
+				}
+
+				log.Printf("[PROXY][%s] CA file loaded at %s", proxy, one)
+				caPool.AppendCertsFromPEM(caData)
+			}
+
+			h2topt.TLSClientConfig.RootCAs = caPool
 		}
 	}
 
