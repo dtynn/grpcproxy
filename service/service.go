@@ -119,11 +119,12 @@ func (this *Service) signalHandler() {
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR2)
 	for {
 		sig := <-ch
+		log.Printf("[SERVER] got signal %s", sig)
+
 		switch sig {
 		case syscall.SIGINT, syscall.SIGTERM:
 			// this ensures a subsequent INT/TERM will trigger standard go behaviour of
 			// terminating.
-			log.Printf("[SERVER] got signal %s", sig)
 			signal.Stop(ch)
 			this.Close()
 			return
