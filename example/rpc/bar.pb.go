@@ -8,12 +8,15 @@ Package rpc is a generated protocol buffer package.
 It is generated from these files:
 	bar.proto
 	foo.proto
+	pulse.proto
 
 It has these top-level messages:
 	BarReq
 	BarResp
 	FooReq
 	FooResp
+	BeatReq
+	BeatResp
 */
 package rpc
 

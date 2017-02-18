@@ -21,6 +21,7 @@ import (
 
 	"github.com/dtynn/grpcproxy/example/gproxy/bar"
 	"github.com/dtynn/grpcproxy/example/gproxy/foo"
+	"github.com/dtynn/grpcproxy/example/gproxy/pulse"
 )
 
 var port int
@@ -58,6 +59,15 @@ var serviceCmd = &cobra.Command{
 
 			if err := s.Run(); err != nil {
 				log.Fatalf("bar service error: %s", err)
+			}
+
+		case "pulse":
+			s := pulse.Service{
+				Port: port,
+			}
+
+			if err := s.Run(); err != nil {
+				log.Fatalf("pulse service error: %s", err)
 			}
 
 		default:

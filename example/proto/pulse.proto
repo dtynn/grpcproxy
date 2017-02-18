@@ -1,0 +1,16 @@
+syntax = "proto3";
+package rpc;
+
+service Pulse {
+    rpc Beat(stream BeatReq) returns (stream BeatResp);
+}
+
+// ---------------------------------------------------------------------------
+
+message BeatReq {
+    string greeting = 1;
+}
+
+message BeatResp {
+    string received = 1;
+}
