@@ -5,61 +5,99 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 
 	"github.com/dtynn/grpcproxy/config"
 	"github.com/dtynn/grpcproxy/netutil"
 )
 
-func NewService(cfg config.ServerConfig) (*Service, error) {
-	service := &Service{
-		cfg:     cfg,
-		closeCh: make(chan struct{}, 1),
-	}
+func NewServiceWithCfgFile(cfgFilePath string) (*Service, error) {
+	service := NewService()
+	service.cfgFilePath = cfgFilePath
 
-	// init apps
-	service.bindings = map[string]Apps{}
-
-	for _, appCfg := range cfg.App {
-		app, err := NewApp(service, appCfg)
-		if err != nil {
-			return nil, err
-		}
-
-		service.apps = append(service.apps, app)
-
-		for _, bind := range app.Bind() {
-			service.bindings[bind] = append(service.bindings[bind], app)
-		}
-	}
-
-	// load cert files
-	if len(cfg.Cert) == 2 {
-		cert, err := tls.LoadX509KeyPair(cfg.Cert[0], cfg.Cert[1])
-		if err != nil {
-			return nil, fmt.Errorf("[SERVER BUILD] fail to load cert files %v: %s", cfg.Cert, err)
-		}
-
-		service.cert = []tls.Certificate{cert}
-		log.Printf("[SERVER BUILD] cert files %s loaded", cfg.Cert)
+	err := service.ReloadConfigFile()
+	if err != nil {
+		return nil, err
 	}
 
 	return service, nil
 }
 
+func NewService() *Service {
+	return &Service{
+		stopCh: make(chan struct{}, 1),
+	}
+}
+
 type Service struct {
+	cfgFilePath string
+
 	cfg      config.ServerConfig
 	apps     []*App
 	cert     []tls.Certificate
 	bindings map[string]Apps
 
 	closeCh chan struct{}
+	stopCh  chan struct{}
+	mu      sync.Mutex
+}
+
+func (this *Service) ReloadConfigFile() error {
+	cfg, err := config.ReadConfig(this.cfgFilePath)
+	if err != nil {
+		return err
+	}
+
+	return this.Load(cfg)
+}
+
+func (this *Service) Load(cfg config.ServerConfig) error {
+	// init apps
+	bindings := map[string]Apps{}
+	apps := []*App{}
+
+	for _, appCfg := range cfg.App {
+		app, err := NewApp(this, appCfg)
+		if err != nil {
+			return err
+		}
+
+		apps = append(apps, app)
+
+		for _, bind := range app.Bind() {
+			bindings[bind] = append(bindings[bind], app)
+		}
+	}
+
+	certs := []tls.Certificate{}
+
+	// load cert files
+	if len(cfg.Cert) == 2 {
+		cert, err := tls.LoadX509KeyPair(cfg.Cert[0], cfg.Cert[1])
+		if err != nil {
+			return fmt.Errorf("[SERVER LOAD] fail to load cert files %v: %s", cfg.Cert, err)
+		}
+
+		certs = append(certs, cert)
+		log.Printf("[SERVER LOAD] cert files %s loaded", cfg.Cert)
+	}
+
+	this.mu.Lock()
+	defer this.mu.Unlock()
+
+	this.cfg = cfg
+	this.apps = apps
+	this.cert = certs
+	this.bindings = bindings
+	this.closeCh = make(chan struct{}, 1)
+
+	return nil
 }
 
 func (this *Service) Run() error {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+
 	servers := make([]*netutil.Server, 0, len(this.bindings))
 	for bind, apps := range this.bindings {
 		svr := &http.Server{}
@@ -90,8 +128,6 @@ func (this *Service) Run() error {
 		}(server, &wg, errCh)
 	}
 
-	go this.signalHandler()
-
 	var err error
 
 	select {
@@ -114,20 +150,11 @@ func (this *Service) Close() {
 	close(this.closeCh)
 }
 
-func (this *Service) signalHandler() {
-	ch := make(chan os.Signal, 10)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR2)
-	for {
-		sig := <-ch
-		log.Printf("[SERVER] got signal %s", sig)
+func (this *Service) Stop() {
+	this.Close()
+	close(this.stopCh)
+}
 
-		switch sig {
-		case syscall.SIGINT, syscall.SIGTERM:
-			// this ensures a subsequent INT/TERM will trigger standard go behaviour of
-			// terminating.
-			signal.Stop(ch)
-			this.Close()
-			return
-		}
-	}
+func (this *Service) Wait() {
+	<-this.stopCh
 }

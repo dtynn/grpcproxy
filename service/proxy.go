@@ -198,32 +198,5 @@ func buildTargetUrl(tls bool, back string) (*url.URL, error) {
 		return nil, nil
 	}
 
-	target, err := url.Parse(back)
-	if err != nil {
-		return nil, err
-	}
-
-	if target.Host == "" && target.Scheme != "" && target.Opaque != "" {
-		// like "dev.yogurbox.com:51000", "localhost:51000"
-
-		target.Host = fmt.Sprintf("%s:%s", target.Scheme, target.Opaque)
-		target.Opaque = ""
-		target.Scheme = ""
-
-	} else if target.Host == "" && target.Path != "" {
-		// like "127.0.0.1:51000"
-
-		target.Host = target.Path
-		target.Path = ""
-	}
-
-	if target.Scheme == "" {
-		if tls {
-			target.Scheme = "https"
-		} else {
-			target.Scheme = "http"
-		}
-	}
-
-	return target, nil
+	return parseURL(back, tls)
 }

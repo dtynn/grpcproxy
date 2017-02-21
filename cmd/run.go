@@ -16,10 +16,12 @@ package cmd
 
 import (
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
-	"github.com/dtynn/grpcproxy/config"
 	"github.com/dtynn/grpcproxy/service"
 	"github.com/dtynn/grpcproxy/version"
 )
@@ -36,22 +38,38 @@ var runCmd = &cobra.Command{
 			cfgFile = "./example.conf"
 		}
 
-		cfg, err := config.ReadConfig(cfgFile)
-		if err != nil {
-			log.Fatalf("fail to read config: %s", err)
-		}
-
-		svr, err := service.NewService(cfg)
+		svr, err := service.NewServiceWithCfgFile(cfgFile)
 		if err != nil {
 			log.Fatalf("fail to init service %s", err)
 		}
 
+		go signalHandler(svr)
+
 		if err := svr.Run(); err != nil {
-			log.Fatalf("server failure %s", err)
+			log.Fatalf("got server error %q", err)
 		}
 
 		log.Println("server stopped")
 	},
+}
+
+func signalHandler(service *service.Service) {
+	ch := make(chan os.Signal, 10)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR2)
+	for {
+		sig := <-ch
+		log.Printf("[SERVER] got signal %s", sig)
+
+		switch sig {
+		case syscall.SIGINT, syscall.SIGTERM:
+			// this ensures a subsequent INT/TERM will trigger standard go behaviour of
+			// terminating.
+			signal.Stop(ch)
+			service.Stop()
+			return
+
+		}
+	}
 }
 
 func init() {
