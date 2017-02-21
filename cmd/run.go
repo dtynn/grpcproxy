@@ -44,10 +44,12 @@ var runCmd = &cobra.Command{
 		}
 
 		go signalHandler(svr)
+		go svr.Run()
 
-		if err := svr.Run(); err != nil {
-			log.Fatalf("got server error %q", err)
-		}
+		// if err := svr.Run(); err != nil {
+		// 	log.Fatalf("got server error %q", err)
+		// }
+		svr.Wait()
 
 		log.Println("server stopped")
 	},
@@ -68,6 +70,10 @@ func signalHandler(service *service.Service) {
 			service.Stop()
 			return
 
+		case syscall.SIGUSR2:
+			service.Close()
+			service.ReloadConfigFile()
+			go service.Run()
 		}
 	}
 }
