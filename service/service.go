@@ -25,7 +25,8 @@ func NewServiceWithCfgFile(cfgFilePath string) (*Service, error) {
 
 func NewService() *Service {
 	return &Service{
-		stopCh: make(chan struct{}, 1),
+		stopCh:  make(chan struct{}, 1),
+		closeCh: make(chan struct{}, 1),
 	}
 }
 
@@ -89,7 +90,6 @@ func (this *Service) Load(cfg config.ServerConfig) error {
 	this.apps = apps
 	this.cert = certs
 	this.bindings = bindings
-	this.closeCh = make(chan struct{}, 1)
 
 	return nil
 }
@@ -147,7 +147,7 @@ func (this *Service) Run() error {
 }
 
 func (this *Service) Close() {
-	close(this.closeCh)
+	this.closeCh <- struct{}{}
 }
 
 func (this *Service) Stop() {
