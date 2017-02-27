@@ -127,7 +127,7 @@ func NewProxy(app *App, cfg *config.ProxyConfig) (*Proxy, error) {
 		balancer, err = netutil.Least(backends)
 
 	default:
-		balancer, err = netutil.Random(backends)
+		balancer, err = netutil.RoundRobin(backends)
 	}
 
 	if err != nil {

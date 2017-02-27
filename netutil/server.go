@@ -61,9 +61,7 @@ func (this *Server) Close() {
 }
 
 func (this *Server) serve(conn net.Conn, isTLS bool) {
-	this.mu.RLock()
 	tlsCfg := this.h2opts.BaseConfig.TLSConfig
-	this.mu.RUnlock()
 
 	if isTLS && tlsCfg != nil {
 		tlsConn := tls.Server(conn, tlsCfg)
@@ -77,13 +75,6 @@ func (this *Server) serve(conn net.Conn, isTLS bool) {
 	}
 
 	this.ServeConn(conn, this.h2opts)
-}
-
-func (this *Server) Reload(tlsCfg *tls.Config, handler http.Handler) {
-	this.mu.Lock()
-	this.h2opts.BaseConfig.TLSConfig = tlsCfg
-	this.h2opts.Handler = handler
-	this.mu.Unlock()
 }
 
 func (this *Server) accept(l net.Listener, isTLS bool) {

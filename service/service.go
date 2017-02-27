@@ -12,11 +12,15 @@ import (
 )
 
 func NewServiceWithCfgFile(cfgFilePath string) (*Service, error) {
+	cfg, err := config.ReadConfig(cfgFilePath)
+	if err != nil {
+		return nil, err
+	}
+
 	service := NewService()
 	service.cfgFilePath = cfgFilePath
 
-	err := service.ReloadConfigFile()
-	if err != nil {
+	if err := service.Init(cfg); err != nil {
 		return nil, err
 	}
 
@@ -35,6 +39,7 @@ type Service struct {
 
 	cfg config.ServerConfig
 
+	apps []*App
 	svrs []*netutil.Server
 
 	closeCh chan struct{}
@@ -54,6 +59,8 @@ func (this *Service) Init(cfg config.ServerConfig) error {
 		return err
 	}
 
+	this.apps = apps
+
 	cert, err := loadCerts(cfg.Cert)
 	if err != nil {
 		return err
@@ -70,7 +77,7 @@ func (this *Service) Init(cfg config.ServerConfig) error {
 	for _, bind := range bindings {
 		svr := &http.Server{}
 		svr.Addr = bind
-		svr.Handler = apps
+		svr.Handler = this
 		if len(cert) > 0 {
 			svr.TLSConfig = &tls.Config{
 				Certificates: cert,
@@ -81,6 +88,7 @@ func (this *Service) Init(cfg config.ServerConfig) error {
 	}
 
 	this.svrs = svrs
+	this.initialized = true
 	return nil
 }
 
@@ -101,22 +109,9 @@ func (this *Service) Reload(cfg config.ServerConfig) error {
 		return err
 	}
 
-	cert, err := loadCerts(cfg.Bind)
-	if err != nil {
-		return err
-	}
-
-	var tlsCfg *tls.Config
-	if len(cert) > 0 {
-		tlsCfg = &tls.Config{
-			Certificates: cert,
-			NextProtos:   netutil.NextProtos,
-		}
-	}
-
-	for _, svr := range this.svrs {
-		svr.Reload(tlsCfg, apps)
-	}
+	this.mu.Lock()
+	this.apps = apps
+	this.mu.Unlock()
 
 	return nil
 }
@@ -168,8 +163,8 @@ func (this *Service) Close() {
 	close(this.closeCh)
 }
 
-func (this *Service) buildApps(cfg *config.ServerConfig) (Apps, error) {
-	apps := make(Apps, 0, len(cfg.App))
+func (this *Service) buildApps(cfg *config.ServerConfig) ([]*App, error) {
+	apps := make([]*App, 0, len(cfg.App))
 
 	for _, appCfg := range cfg.App {
 		app, err := NewApp(this, appCfg)
@@ -181,6 +176,21 @@ func (this *Service) buildApps(cfg *config.ServerConfig) (Apps, error) {
 	}
 
 	return apps, nil
+}
+
+func (this *Service) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	this.mu.RLock()
+	apps := this.apps
+	this.mu.RUnlock()
+
+	for _, app := range apps {
+		if proxy, ok := app.Match(req); ok {
+			proxy.ServeHTTP(rw, req)
+			return
+		}
+	}
+
+	log.Printf("[NOT FOUND][%s] %s%s", req.Method, req.Host, req.RequestURI)
 }
 
 func loadCerts(path []string) ([]tls.Certificate, error) {

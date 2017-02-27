@@ -70,16 +70,3 @@ func (this *App) matchHost(req *http.Request) bool {
 
 	return false
 }
-
-type Apps []*App
-
-func (this Apps) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	for _, app := range this {
-		if proxy, ok := app.Match(req); ok {
-			proxy.ServeHTTP(rw, req)
-			return
-		}
-	}
-
-	log.Printf("[NOT FOUND][%s] %s%s", req.Method, req.Host, req.RequestURI)
-}
