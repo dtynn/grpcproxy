@@ -55,19 +55,10 @@ type AppConfig struct {
 
 	Name   string                    `hcl:"-" json:"-"`
 	Host   string                    `hcl:"host,omitempty" json:"host,omitempty"`
-	Bind   []string                  `hcl:"bind,omitempty" json:"bind,omitempty"`
 	GRPC   *bool                     `hcl:"grpc,omitempty" json:"grpc,omitempty"`
 	CA     []string                  `hcl:"ca" json:"ca"`
 	ProxyM []map[string]*ProxyConfig `hcl:"proxy,omitempty" json:"proxy,omitempty"`
 	Proxy  []*ProxyConfig            `hcl:"-" json:"-"`
-}
-
-func (this *AppConfig) GetBind() []string {
-	if len(this.Bind) == 0 {
-		return this.server.Bind
-	}
-
-	return this.Bind
 }
 
 func (this *AppConfig) GetGRPC() bool {
