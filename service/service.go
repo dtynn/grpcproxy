@@ -12,11 +12,15 @@ import (
 )
 
 func NewServiceWithCfgFile(cfgFilePath string) (*Service, error) {
+	cfg, err := config.ReadConfig(cfgFilePath)
+	if err != nil {
+		return nil, err
+	}
+
 	service := NewService()
 	service.cfgFilePath = cfgFilePath
 
-	err := service.ReloadConfigFile()
-	if err != nil {
+	if err := service.Init(cfg); err != nil {
 		return nil, err
 	}
 
@@ -25,22 +29,67 @@ func NewServiceWithCfgFile(cfgFilePath string) (*Service, error) {
 
 func NewService() *Service {
 	return &Service{
-		stopCh:  make(chan struct{}, 1),
 		closeCh: make(chan struct{}, 1),
 	}
 }
 
 type Service struct {
 	cfgFilePath string
+	initialized bool
 
-	cfg      config.ServerConfig
-	apps     []*App
-	cert     []tls.Certificate
-	bindings map[string]Apps
+	cfg config.ServerConfig
+
+	apps []*App
+	svrs []*netutil.Server
 
 	closeCh chan struct{}
-	stopCh  chan struct{}
-	mu      sync.Mutex
+	mu      sync.RWMutex
+}
+
+func (this *Service) Init(cfg config.ServerConfig) error {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+
+	if this.initialized {
+		return fmt.Errorf("[SERVER] already initialized")
+	}
+
+	apps, err := this.buildApps(&cfg)
+	if err != nil {
+		return err
+	}
+
+	this.apps = apps
+
+	cert, err := loadCerts(cfg.Cert)
+	if err != nil {
+		return err
+	}
+
+	bindings := nonEmptySlice(cfg.Bind)
+	if len(bindings) == 0 {
+		return fmt.Errorf("[SERVER] bindings required")
+	}
+
+	log.Printf("[SERVER] bind on %v", bindings)
+
+	svrs := make([]*netutil.Server, 0, len(bindings))
+	for _, bind := range bindings {
+		svr := &http.Server{}
+		svr.Addr = bind
+		svr.Handler = this
+		if len(cert) > 0 {
+			svr.TLSConfig = &tls.Config{
+				Certificates: cert,
+				NextProtos:   netutil.NextProtos,
+			}
+		}
+		svrs = append(svrs, netutil.NewServer(svr))
+	}
+
+	this.svrs = svrs
+	this.initialized = true
+	return nil
 }
 
 func (this *Service) ReloadConfigFile() error {
@@ -49,70 +98,34 @@ func (this *Service) ReloadConfigFile() error {
 		return err
 	}
 
-	return this.Load(cfg)
+	return this.Reload(cfg)
 }
 
-func (this *Service) Load(cfg config.ServerConfig) error {
+func (this *Service) Reload(cfg config.ServerConfig) error {
+	log.Printf("[SERVER] reloading")
 	// init apps
-	bindings := map[string]Apps{}
-	apps := []*App{}
-
-	for _, appCfg := range cfg.App {
-		app, err := NewApp(this, appCfg)
-		if err != nil {
-			return err
-		}
-
-		apps = append(apps, app)
-
-		for _, bind := range app.Bind() {
-			bindings[bind] = append(bindings[bind], app)
-		}
-	}
-
-	certs := []tls.Certificate{}
-
-	// load cert files
-	if len(cfg.Cert) == 2 {
-		cert, err := tls.LoadX509KeyPair(cfg.Cert[0], cfg.Cert[1])
-		if err != nil {
-			return fmt.Errorf("[SERVER LOAD] fail to load cert files %v: %s", cfg.Cert, err)
-		}
-
-		certs = append(certs, cert)
-		log.Printf("[SERVER LOAD] cert files %s loaded", cfg.Cert)
+	apps, err := this.buildApps(&cfg)
+	if err != nil {
+		return err
 	}
 
 	this.mu.Lock()
-	defer this.mu.Unlock()
-
-	this.cfg = cfg
 	this.apps = apps
-	this.cert = certs
-	this.bindings = bindings
+	this.mu.Unlock()
 
 	return nil
 }
 
 func (this *Service) Run() error {
 	this.mu.Lock()
-	defer this.mu.Unlock()
+	initialized := this.initialized
+	this.mu.Unlock()
 
-	servers := make([]*netutil.Server, 0, len(this.bindings))
-	for bind, apps := range this.bindings {
-		svr := &http.Server{}
-		svr.Addr = bind
-		svr.Handler = apps
-		if len(this.cert) > 0 {
-			svr.TLSConfig = &tls.Config{
-				Certificates: this.cert,
-				NextProtos:   netutil.NextProtos,
-			}
-		}
-
-		server := netutil.NewServer(svr, nil)
-		servers = append(servers, server)
+	if !initialized {
+		return fmt.Errorf("server not initialized")
 	}
+
+	servers := this.svrs
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(servers))
@@ -147,14 +160,49 @@ func (this *Service) Run() error {
 }
 
 func (this *Service) Close() {
-	this.closeCh <- struct{}{}
+	close(this.closeCh)
 }
 
-func (this *Service) Stop() {
-	this.Close()
-	close(this.stopCh)
+func (this *Service) buildApps(cfg *config.ServerConfig) ([]*App, error) {
+	apps := make([]*App, 0, len(cfg.App))
+
+	for _, appCfg := range cfg.App {
+		app, err := NewApp(this, appCfg)
+		if err != nil {
+			return nil, err
+		}
+
+		apps = append(apps, app)
+	}
+
+	return apps, nil
 }
 
-func (this *Service) Wait() {
-	<-this.stopCh
+func (this *Service) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	this.mu.RLock()
+	apps := this.apps
+	this.mu.RUnlock()
+
+	for _, app := range apps {
+		if proxy, ok := app.Match(req); ok {
+			proxy.ServeHTTP(rw, req)
+			return
+		}
+	}
+
+	log.Printf("[NOT FOUND][%s] %s%s", req.Method, req.Host, req.RequestURI)
+}
+
+func loadCerts(path []string) ([]tls.Certificate, error) {
+	certs := []tls.Certificate{}
+	if len(path) == 2 {
+		cert, err := tls.LoadX509KeyPair(path[0], path[1])
+		if err != nil {
+			return nil, err
+		}
+
+		certs = append(certs, cert)
+	}
+
+	return certs, nil
 }
