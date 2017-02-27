@@ -22,8 +22,6 @@ func NewApp(service *Service, cfg *config.AppConfig) (*App, error) {
 		app.hosts = append(app.hosts, glob.MustCompile(one))
 	}
 
-	log.Printf("[APP][%s] bind on %s", app, cfg.GetBind())
-
 	for _, proxyCfg := range cfg.Proxy {
 		proxy, err := NewProxy(app, proxyCfg)
 		if err != nil {
@@ -71,10 +69,6 @@ func (this *App) matchHost(req *http.Request) bool {
 	}
 
 	return false
-}
-
-func (this *App) Bind() []string {
-	return nonEmptySlice(this.cfg.GetBind())
 }
 
 type Apps []*App
