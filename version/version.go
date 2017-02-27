@@ -10,8 +10,8 @@ func Version() *version {
 
 var v = &version{
 	major: 0,
-	minor: 2,
-	patch: 3,
+	minor: 3,
+	patch: 0,
 }
 
 type version struct {
