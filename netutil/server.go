@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/cockroachdb/cmux"
 	"golang.org/x/net/http2"
@@ -13,6 +14,10 @@ import (
 
 func NewServer(svr *http.Server) *Server {
 	return &Server{
+		Server: http2.Server{
+			IdleTimeout: time.Hour,
+		},
+
 		h2opts: &http2.ServeConnOpts{
 			BaseConfig: svr,
 		},
